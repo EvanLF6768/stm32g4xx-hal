@@ -77,6 +77,7 @@ pub enum ClockMode {
 }
 
 pub trait QuadSpiExt {
+    #[allow(clippy::too_many_arguments)]
     fn qspi<PINS>(
         self,
         pins: PINS,
@@ -92,6 +93,7 @@ pub trait QuadSpiExt {
 }
 
 impl QuadSpiExt for QUADSPI {
+    #[allow(clippy::too_many_arguments)]
     fn qspi<PINS>(
         self,
         _pins: PINS,
@@ -218,7 +220,7 @@ pub struct Command {
 impl Command {
     pub fn new(ddr_mode: DdrMode) -> Self {
         Self {
-            ddr_mode: ddr_mode,
+            ddr_mode,
 
             instruction: None,
             address: None,
@@ -272,7 +274,7 @@ pub struct IoCommand {
 impl IoCommand {
     pub fn new(ddr_mode: DdrMode, line_mode: LineMode) -> Self {
         Self {
-            ddr_mode: ddr_mode,
+            ddr_mode,
             send_instruction_once: false,
 
             instruction: None,
@@ -334,6 +336,7 @@ enum FunctionalMode {
 }
 
 impl Qspi {
+    #[allow(clippy::too_many_arguments)]
     fn config(
         inst: &mut QUADSPI,
         functional_mode: FunctionalMode,
@@ -350,76 +353,65 @@ impl Qspi {
         // - AR: if DR is not required; or
         // - DR: otherwise.
 
-        match alternate_bytes {
-            Some(altb) => {
-                inst.abr().write(|w| unsafe { w.bits(altb.data.to_u32()) });
-            }
-            None => {}
-        };
+        if let Some(altb) = alternate_bytes {
+            inst.abr().write(|w| unsafe { w.bits(altb.data.to_u32()) });
+        }
 
         inst.ccr().write(|w| {
-            match instruction {
-                Some(inst) => {
-                    w.instruction().set(inst.data);
-                    match inst.mode {
-                        LineMode::Single => w.imode().single_line(),
-                        LineMode::Dual => w.imode().two_lines(),
-                        LineMode::Quad => w.imode().four_lines(),
-                    };
-                }
-                None => {
-                    w.imode().no_instruction();
-                }
+            if let Some(inst) = instruction {
+                w.instruction().set(inst.data);
+                match inst.mode {
+                    LineMode::Single => w.imode().single_line(),
+                    LineMode::Dual => w.imode().two_lines(),
+                    LineMode::Quad => w.imode().four_lines(),
+                };
+            } else {
+                w.imode().no_instruction();
             }
 
-            match address {
-                Some(addr) => {
-                    match addr.mode {
-                        LineMode::Single => w.admode().single_line(),
-                        LineMode::Dual => w.admode().two_lines(),
-                        LineMode::Quad => w.admode().four_lines(),
-                    };
-                    match addr.data {
-                        CommandArgumentData::OneByte(_) => w.adsize().bit8(),
-                        CommandArgumentData::TwoBytes(_) => w.adsize().bit16(),
-                        CommandArgumentData::ThreeBytes(_) => w.adsize().bit24(),
-                        CommandArgumentData::FourBytes(_) => w.adsize().bit32(),
-                    };
-                }
-                None => {
-                    w.admode().no_address();
-                }
+            if let Some(addr) = address {
+                match addr.mode {
+                    LineMode::Single => w.admode().single_line(),
+                    LineMode::Dual => w.admode().two_lines(),
+                    LineMode::Quad => w.admode().four_lines(),
+                };
+                match addr.data {
+                    CommandArgumentData::OneByte(_) => w.adsize().bit8(),
+                    CommandArgumentData::TwoBytes(_) => w.adsize().bit16(),
+                    CommandArgumentData::ThreeBytes(_) => w.adsize().bit24(),
+                    CommandArgumentData::FourBytes(_) => w.adsize().bit32(),
+                };
+            } else {
+                w.admode().no_address();
             }
 
-            match alternate_bytes {
-                Some(altb) => {
-                    match altb.mode {
-                        LineMode::Single => w.abmode().single_line(),
-                        LineMode::Dual => w.abmode().two_lines(),
-                        LineMode::Quad => w.abmode().four_lines(),
-                    };
-                    match altb.data {
-                        CommandArgumentData::OneByte(_) => w.absize().bit8(),
-                        CommandArgumentData::TwoBytes(_) => w.absize().bit16(),
-                        CommandArgumentData::ThreeBytes(_) => w.absize().bit24(),
-                        CommandArgumentData::FourBytes(_) => w.absize().bit32(),
-                    };
-                }
-                None => {
-                    w.abmode().no_alternate_bytes();
-                }
+            if let Some(altb) = alternate_bytes {
+                match altb.mode {
+                    LineMode::Single => w.abmode().single_line(),
+                    LineMode::Dual => w.abmode().two_lines(),
+                    LineMode::Quad => w.abmode().four_lines(),
+                };
+                match altb.data {
+                    CommandArgumentData::OneByte(_) => w.absize().bit8(),
+                    CommandArgumentData::TwoBytes(_) => w.absize().bit16(),
+                    CommandArgumentData::ThreeBytes(_) => w.absize().bit24(),
+                    CommandArgumentData::FourBytes(_) => w.absize().bit32(),
+                };
+            } else {
+                w.abmode().no_alternate_bytes();
             }
 
-            w.dcyc().set(dummy_cycles.into());
+            w.dcyc().set(dummy_cycles);
 
-            match data_mode {
-                Some(datm) => match datm {
+            if let Some(datm) = data_mode {
+                match datm {
                     LineMode::Single => w.dmode().single_line(),
                     LineMode::Dual => w.dmode().two_lines(),
                     LineMode::Quad => w.dmode().four_lines(),
-                },
-                None => w.dmode().no_data(),
-            };
+                };
+            } else {
+                w.dmode().no_data();
+            }
 
             match functional_mode {
                 FunctionalMode::Read => w.fmode().indirect_read(),
@@ -436,11 +428,8 @@ impl Qspi {
                 .bit(ddr_mode != DdrMode::Disabled)
         });
 
-        match address {
-            Some(addr) => {
-                inst.ar().write(|w| unsafe { w.bits(addr.data.to_u32()) });
-            }
-            None => {}
+        if let Some(addr) = address {
+            inst.ar().write(|w| unsafe { w.bits(addr.data.to_u32()) });
         }
     }
 
@@ -485,8 +474,8 @@ impl Qspi {
             Some(command.data_mode),
         );
 
-        for i in 0..data.len() {
-            data[i] = self.inst.dr8().read().bits();
+        for d in data {
+            *d = self.inst.dr8().read().bits();
         }
     }
 
@@ -509,8 +498,8 @@ impl Qspi {
             Some(command.data_mode),
         );
 
-        for i in 0..data.len() {
-            self.inst.dr8().write(|w| w.set(data[i]));
+        for d in data {
+            self.inst.dr8().write(|w| w.set(*d));
         }
 
         while self.inst.sr().read().tcf().is_not_complete() {}
