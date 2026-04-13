@@ -93,6 +93,7 @@ pub mod syscfg;
 pub mod time;
 pub mod timer;
 // pub mod watchdog;
+pub mod quadspi;
 pub mod rng;
 
 #[cfg(all(
